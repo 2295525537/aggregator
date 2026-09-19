@@ -9,9 +9,13 @@ const PORT = process.env.PORT || 3000;
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-// 兼容前端 api.php/ 路径（虚拟主机 PHP 后端路径），本地 Node.js 环境自动转写到 /api/
+// 兼容前端 api.php 路径（虚拟主机 PHP 后端），本地 Node.js 环境自动转写到 /api/
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api.php')) {
+  if (req.path === '/api.php') {
+    const p = req.query.path || '';
+    req.url = '/api/' + p;
+    req.query = {};
+  } else if (req.path.startsWith('/api.php/')) {
     req.url = req.url.replace('/api.php', '/api');
   }
   next();

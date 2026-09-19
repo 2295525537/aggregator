@@ -1,12 +1,9 @@
 # AI 单词游戏 - 虚拟主机配置
-# 开启 PATH_INFO 支持
-AcceptPathInfo On
-
 # 默认首页
-DirectoryIndex index.html
+DirectoryIndex index.html check.php
 
-# 保护数据目录
-<FilesMatch "^db\.json$">
+# 保护数据文件不被直接下载
+<FilesMatch "\.(json)$">
     Order allow,deny
     Deny from all
 </FilesMatch>

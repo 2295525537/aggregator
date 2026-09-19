@@ -1,6 +1,6 @@
 // Teacher Dashboard
-// API 指向 api.php（兼容虚拟主机 PHP 环境）
-const API_BASE = 'api.php/';
+// API 使用查询字符串传参（兼容所有 PHP 虚拟主机，无需 PATH_INFO 支持）
+const API_BASE = 'api.php?path=';
 let teacherToken = localStorage.getItem('wordgame_teacher_token') || null;
 let allStudents = [];
 let currentFilter = 'all';
@@ -8,7 +8,8 @@ let currentFilter = 'all';
 async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (teacherToken) headers['Authorization'] = 'Bearer ' + teacherToken;
-  const url = API_BASE + path.replace(/^\/api\//, '');
+  const realPath = path.replace(/^\/api\//, '');
+  const url = API_BASE + realPath;
   const res = await fetch(url, { headers, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
   return res.json();
 }

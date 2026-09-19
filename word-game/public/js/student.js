@@ -1,12 +1,13 @@
 // AI Word Game - Student App
-// API 指向 api.php（兼容虚拟主机 PHP 环境）
-const API_BASE = 'api.php/';
+// API 使用查询字符串传参（兼容所有 PHP 虚拟主机，无需 PATH_INFO 支持）
+const API_BASE = 'api.php?path=';
 let currentStudent = JSON.parse(localStorage.getItem('wordgame_student') || 'null');
 let gameState = null;
 
 // ---------- API helpers ----------
 async function api(path, opts = {}) {
-  const url = API_BASE + path.replace(/^\/api\//, '');
+  const realPath = path.replace(/^\/api\//, '');
+  const url = API_BASE + realPath;
   const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
     ...opts,
