@@ -13,8 +13,9 @@ app.use(bodyParser.json({ limit: '10mb' }));
 app.use((req, res, next) => {
   if (req.path === '/api.php') {
     const p = req.query.path || '';
+    const token = req.query.token || '';
     req.url = '/api/' + p;
-    req.query = {};
+    req.query = token ? { token } : {};
   } else if (req.path.startsWith('/api.php/')) {
     req.url = req.url.replace('/api.php', '/api');
   }
@@ -198,9 +199,9 @@ app.post('/api/teacher/login', (req, res) => {
   }
 });
 
-// Teacher stats (simple token check)
+// Teacher stats (simple token check, supports header or query param)
 app.get('/api/teacher/stats', (req, res) => {
-  const token = req.headers.authorization;
+  const token = req.headers.authorization || (req.query.token ? 'Bearer ' + req.query.token : '');
   if (!token || !token.startsWith('Bearer teacher_token_')) {
     return res.status(401).json({ error: '未授权' });
   }

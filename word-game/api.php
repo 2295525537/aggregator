@@ -222,9 +222,26 @@ if ($method === 'POST' && count($segments) === 2 && $segments[0] === 'teacher' &
     }
 }
 
+// 辅助函数：获取 Authorization 头（兼容各种 PHP 环境）
+function getAuthHeader() {
+    // 1. 标准方式
+    if (!empty($_SERVER['HTTP_AUTHORIZATION'])) return $_SERVER['HTTP_AUTHORIZATION'];
+    // 2. CGI/FastCGI 重定向方式
+    if (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) return $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    // 3. Apache getallheaders()
+    if (function_exists('getallheaders')) {
+        $headers = getallheaders();
+        if (isset($headers['Authorization'])) return $headers['Authorization'];
+        if (isset($headers['authorization'])) return $headers['authorization'];
+    }
+    // 4. 查询参数兜底（?token=xxx）
+    if (isset($_GET['token'])) return 'Bearer ' . $_GET['token'];
+    return '';
+}
+
 // GET /teacher/stats
 if ($method === 'GET' && count($segments) === 2 && $segments[0] === 'teacher' && $segments[1] === 'stats') {
-    $auth = isset($_SERVER['HTTP_AUTHORIZATION']) ? $_SERVER['HTTP_AUTHORIZATION'] : '';
+    $auth = getAuthHeader();
     if (strpos($auth, 'Bearer teacher_token_') !== 0) {
         json_out(['error'=>'未授权'], 401);
     }

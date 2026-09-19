@@ -1,9 +1,21 @@
 # AI 单词游戏 - 虚拟主机配置
+
 # 默认首页（廉价主机只认 index.php）
 DirectoryIndex index.php index.html check.php
+
+# 关键：将 Authorization 头传递给 PHP（廉价主机会剥离此头）
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteCond %{HTTP:Authorization} ^(.*)
+    RewriteRule .* - [e=HTTP_AUTHORIZATION:%1]
+</IfModule>
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
 
 # 保护数据文件不被直接下载
 <FilesMatch "\.(json)$">
     Order allow,deny
     Deny from all
 </FilesMatch>
+
+# 禁止列出目录
+Options -Indexes

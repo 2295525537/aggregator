@@ -23,7 +23,9 @@ async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (teacherToken) headers['Authorization'] = 'Bearer ' + teacherToken;
   const realPath = path.replace(/^\/api\//, '');
-  const url = API_BASE + realPath;
+  // 廉价主机会剥离 Authorization 头，同时用查询参数 token 兜底
+  let url = API_BASE + realPath;
+  if (teacherToken) url += (url.includes('?') ? '&' : '?') + 'token=' + encodeURIComponent(teacherToken);
   try {
     const res = await fetch(url, { headers, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
     const data = await res.json();
@@ -48,9 +50,11 @@ function logout() {
 async function doLogin() {
   const pwd = document.getElementById('pwdInput').value;
   const btn = document.querySelector('#view-login .btn-primary');
+  const errEl = document.getElementById('loginError');
   if (!pwd) { toast('请输入密码', 'error'); return; }
   btn.classList.add('loading');
   btn.disabled = true;
+  if (errEl) errEl.textContent = '';
   const res = await api('/api/teacher/login', { method: 'POST', body: { password: pwd } });
   btn.classList.remove('loading');
   btn.disabled = false;
@@ -63,6 +67,7 @@ async function doLogin() {
     toast('登录成功', 'success');
   } else {
     document.getElementById('pwdInput').value = '';
+    if (errEl) errEl.textContent = '登录失败，请检查密码或网络连接';
   }
 }
 
@@ -245,18 +250,28 @@ async function updateTier(sid) {
 }
 
 // Init
-document.getElementById('pwdInput').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doLogin();
+document.addEventListener('DOMContentLoaded', () => {
+  const pwdInput = document.getElementById('pwdInput');
+  if (pwdInput) {
+    pwdInput.addEventListener('keydown', e => {
+      if (e.key === 'Enter') doLogin();
+    });
+  }
+  if (teacherToken) {
+    const loginView = document.getElementById('view-login');
+    const dashView = document.getElementById('view-dashboard');
+    if (loginView) loginView.classList.add('hidden');
+    if (dashView) dashView.classList.remove('hidden');
+    loadStats();
+  }
 });
-if (teacherToken) {
-  document.getElementById('view-login').classList.add('hidden');
-  document.getElementById('view-dashboard').classList.remove('hidden');
-  loadStats();
-}
 
 // Auto-refresh every 10 seconds
 setInterval(() => {
-  if (teacherToken && !document.getElementById('view-dashboard').classList.contains('hidden')) {
-    loadStats();
+  if (teacherToken) {
+    const dashView = document.getElementById('view-dashboard');
+    if (dashView && !dashView.classList.contains('hidden')) {
+      loadStats();
+    }
   }
 }, 10000);

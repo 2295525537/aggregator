@@ -14,7 +14,8 @@
       <h1>教师后台</h1>
       <p class="subtitle">AI 单词闯关 · 实时学情仪表盘</p>
       <input id="pwdInput" type="password" class="input" placeholder="请输入登录密码" autofocus>
-      <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="doLogin()">登录</button>
+      <div id="loginError" style="color:var(--danger);font-size:13px;margin-top:8px;min-height:18px"></div>
+      <button class="btn btn-primary btn-block" style="margin-top:8px" onclick="doLogin()">登录</button>
       <p style="margin-top:16px;font-size:13px;color:var(--text-light)">
         <a href="index.php" style="color:var(--primary)">← 返回学生端</a>
       </p>
