@@ -9,6 +9,14 @@ const PORT = process.env.PORT || 3000;
 app.use(bodyParser.json({ limit: '10mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+// 兼容前端 api.php/ 路径（虚拟主机 PHP 后端路径），本地 Node.js 环境自动转写到 /api/
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api.php')) {
+    req.url = req.url.replace('/api.php', '/api');
+  }
+  next();
+});
+
 // ---------- Data persistence ----------
 const DATA_DIR = path.join(__dirname, 'data');
 const DB_FILE = path.join(DATA_DIR, 'db.json');

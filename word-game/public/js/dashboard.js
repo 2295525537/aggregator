@@ -1,4 +1,6 @@
 // Teacher Dashboard
+// API 指向 api.php（兼容虚拟主机 PHP 环境）
+const API_BASE = 'api.php/';
 let teacherToken = localStorage.getItem('wordgame_teacher_token') || null;
 let allStudents = [];
 let currentFilter = 'all';
@@ -6,7 +8,8 @@ let currentFilter = 'all';
 async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (teacherToken) headers['Authorization'] = 'Bearer ' + teacherToken;
-  const res = await fetch(path, { headers, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const url = API_BASE + path.replace(/^\/api\//, '');
+  const res = await fetch(url, { headers, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
   return res.json();
 }
 

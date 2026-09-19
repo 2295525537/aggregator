@@ -1,11 +1,13 @@
 // AI Word Game - Student App
-const API = '';
+// API 指向 api.php（兼容虚拟主机 PHP 环境）
+const API_BASE = 'api.php/';
 let currentStudent = JSON.parse(localStorage.getItem('wordgame_student') || 'null');
 let gameState = null;
 
 // ---------- API helpers ----------
 async function api(path, opts = {}) {
-  const res = await fetch(API + path, {
+  const url = API_BASE + path.replace(/^\/api\//, '');
+  const res = await fetch(url, {
     headers: { 'Content-Type': 'application/json' },
     ...opts,
     body: opts.body ? JSON.stringify(opts.body) : undefined
