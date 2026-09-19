@@ -1,0 +1,312 @@
+{
+  "students": [
+    {
+      "id": "stu_1789822873764_lzqrg",
+      "name": "测试学生",
+      "tier": "A",
+      "createdAt": "2026-09-19T13:01:13.764Z",
+      "gameResults": [
+        {
+          "correct": 9,
+          "total": 10,
+          "rate": 0.9,
+          "tier": "A",
+          "wrongWords": [
+            "eye"
+          ],
+          "date": "2026-09-19T13:01:13.802Z"
+        }
+      ],
+      "taskResults": [],
+      "errorBook": [
+        "eye"
+      ]
+    },
+    {
+      "id": "stu_1789822893797_v0mnm",
+      "name": "小明",
+      "tier": null,
+      "createdAt": "2026-09-19T13:01:33.797Z",
+      "gameResults": [],
+      "taskResults": [],
+      "errorBook": []
+    },
+    {
+      "id": "stu_1789822989669_f7gj9",
+      "name": "李华",
+      "tier": "A",
+      "createdAt": "2026-09-19T13:03:09.669Z",
+      "gameResults": [
+        {
+          "correct": 9,
+          "total": 10,
+          "rate": 0.9,
+          "tier": "A",
+          "wrongWords": [
+            "eye",
+            "ear"
+          ],
+          "date": "2026-09-19T13:03:09.695Z"
+        }
+      ],
+      "taskResults": [
+        {
+          "taskTier": "A",
+          "taskType": "quiz",
+          "correct": 7,
+          "total": 8,
+          "rate": 0.875,
+          "wrongWords": [
+            "mouth"
+          ],
+          "date": "2026-09-19T13:03:09.719Z"
+        }
+      ],
+      "errorBook": [
+        "eye",
+        "ear",
+        "mouth"
+      ]
+    },
+    {
+      "id": "stu_1789822989743_vbotn",
+      "name": "王芳",
+      "tier": "B",
+      "createdAt": "2026-09-19T13:03:09.743Z",
+      "gameResults": [
+        {
+          "correct": 7,
+          "total": 10,
+          "rate": 0.7,
+          "tier": "B",
+          "wrongWords": [
+            "hair",
+            "nose"
+          ],
+          "date": "2026-09-19T13:03:09.767Z"
+        }
+      ],
+      "taskResults": [
+        {
+          "taskTier": "B",
+          "taskType": "quiz",
+          "correct": 5,
+          "total": 8,
+          "rate": 0.625,
+          "wrongWords": [
+            "hair"
+          ],
+          "date": "2026-09-19T13:03:09.789Z"
+        }
+      ],
+      "errorBook": [
+        "hair",
+        "nose"
+      ]
+    },
+    {
+      "id": "stu_1789822989813_ozq1c",
+      "name": "张伟",
+      "tier": "C",
+      "createdAt": "2026-09-19T13:03:09.813Z",
+      "gameResults": [
+        {
+          "correct": 5,
+          "total": 10,
+          "rate": 0.5,
+          "tier": "C",
+          "wrongWords": [
+            "head",
+            "face",
+            "long"
+          ],
+          "date": "2026-09-19T13:03:09.837Z"
+        }
+      ],
+      "taskResults": [
+        {
+          "taskTier": "B",
+          "taskType": "quiz",
+          "correct": 4,
+          "total": 8,
+          "rate": 0.5,
+          "wrongWords": [
+            "long"
+          ],
+          "date": "2026-09-19T13:03:09.860Z"
+        }
+      ],
+      "errorBook": [
+        "head",
+        "face",
+        "long"
+      ]
+    },
+    {
+      "id": "stu_1789822989886_z1jtr",
+      "name": "陈静",
+      "tier": "C",
+      "createdAt": "2026-09-19T13:03:09.886Z",
+      "gameResults": [
+        {
+          "correct": 4,
+          "total": 10,
+          "rate": 0.4,
+          "tier": "C",
+          "wrongWords": [
+            "eye",
+            "mouth",
+            "hair",
+            "sit"
+          ],
+          "date": "2026-09-19T13:03:09.909Z"
+        }
+      ],
+      "taskResults": [
+        {
+          "taskTier": "C",
+          "taskType": "quiz",
+          "correct": 2,
+          "total": 8,
+          "rate": 0.25,
+          "wrongWords": [
+            "eye",
+            "sit"
+          ],
+          "date": "2026-09-19T13:03:09.932Z"
+        }
+      ],
+      "errorBook": [
+        "eye",
+        "mouth",
+        "hair",
+        "sit"
+      ]
+    },
+    {
+      "id": "stu_1789822989956_mvrep",
+      "name": "刘洋",
+      "tier": "C",
+      "createdAt": "2026-09-19T13:03:09.956Z",
+      "gameResults": [
+        {
+          "correct": 3,
+          "total": 10,
+          "rate": 0.3,
+          "tier": "C",
+          "wrongWords": [
+            "head",
+            "eye",
+            "ear",
+            "mouth",
+            "nose"
+          ],
+          "date": "2026-09-19T13:03:09.981Z"
+        }
+      ],
+      "taskResults": [
+        {
+          "taskTier": "C",
+          "taskType": "quiz",
+          "correct": 1,
+          "total": 8,
+          "rate": 0.125,
+          "wrongWords": [
+            "head"
+          ],
+          "date": "2026-09-19T13:03:10.002Z"
+        }
+      ],
+      "errorBook": [
+        "head",
+        "eye",
+        "ear",
+        "mouth",
+        "nose"
+      ]
+    },
+    {
+      "id": "stu_1789822990026_u031i",
+      "name": "赵敏",
+      "tier": "B",
+      "createdAt": "2026-09-19T13:03:10.026Z",
+      "gameResults": [
+        {
+          "correct": 8,
+          "total": 10,
+          "rate": 0.8,
+          "tier": "B",
+          "wrongWords": [
+            "short"
+          ],
+          "date": "2026-09-19T13:03:10.048Z"
+        }
+      ],
+      "taskResults": [
+        {
+          "taskTier": "B",
+          "taskType": "quiz",
+          "correct": 6,
+          "total": 8,
+          "rate": 0.75,
+          "wrongWords": [
+            "short"
+          ],
+          "date": "2026-09-19T13:03:10.071Z"
+        }
+      ],
+      "errorBook": [
+        "short"
+      ]
+    },
+    {
+      "id": "stu_1789823051174_fsrvs",
+      "name": "测试任务单",
+      "tier": "A",
+      "createdAt": "2026-09-19T13:04:11.174Z",
+      "gameResults": [
+        {
+          "correct": 9,
+          "total": 10,
+          "rate": 0.9,
+          "tier": "A",
+          "wrongWords": [
+            "eye"
+          ],
+          "date": "2026-09-19T13:04:19.187Z"
+        }
+      ],
+      "taskResults": [
+        {
+          "taskTier": "B",
+          "taskType": "quiz",
+          "correct": 5,
+          "total": 8,
+          "rate": 0.625,
+          "wrongWords": [
+            "nose",
+            "long",
+            "short"
+          ],
+          "date": "2026-09-19T13:06:51.723Z"
+        }
+      ],
+      "errorBook": [
+        "eye",
+        "nose",
+        "long",
+        "short"
+      ]
+    },
+    {
+      "id": "stu_1789823735968_yvxzb",
+      "name": "发",
+      "tier": null,
+      "createdAt": "2026-09-19T13:15:35.968Z",
+      "gameResults": [],
+      "taskResults": [],
+      "errorBook": []
+    }
+  ],
+  "teacherPassword": "7405211"
+}

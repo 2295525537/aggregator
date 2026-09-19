@@ -1,0 +1,14 @@
+{
+  "name": "ai-word-game",
+  "version": "1.0.0",
+  "description": "AI 单词闯关游戏 - 学情采集 + AI 自动分层 + 个性化助学",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "body-parser": "^1.20.2"
+  }
+}
