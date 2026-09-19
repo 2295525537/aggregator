@@ -123,8 +123,8 @@ a { color: #6c5ce7; }
   <?php endif; ?>
 
   <div style="margin-top: 20px; text-align: center; font-size: 14px;">
-    <a href="index.html">→ 进入学生端</a> &nbsp;|&nbsp;
-    <a href="dashboard.html">→ 教师后台</a>
+    <a href="index.php">→ 进入学生端</a> &nbsp;|&nbsp;
+    <a href="dashboard.php">→ 教师后台</a>
   </div>
 </div>
 </body>

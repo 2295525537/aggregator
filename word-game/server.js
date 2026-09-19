@@ -7,9 +7,9 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(bodyParser.json({ limit: '10mb' }));
-app.use(express.static(path.join(__dirname, 'public')));
 
 // 兼容前端 api.php 路径（虚拟主机 PHP 后端），本地 Node.js 环境自动转写到 /api/
+// 必须在 express.static 之前，否则 api.php 会被当作静态文件返回源码
 app.use((req, res, next) => {
   if (req.path === '/api.php') {
     const p = req.query.path || '';
@@ -20,6 +20,10 @@ app.use((req, res, next) => {
   }
   next();
 });
+
+// 静态资源：优先从根目录（PHP 虚拟主机结构），再从 public/（Node.js 结构）
+app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname, 'public')));
 
 // ---------- Data persistence ----------
 const DATA_DIR = path.join(__dirname, 'data');

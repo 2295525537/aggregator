@@ -1,6 +1,6 @@
 # AI 单词游戏 - 虚拟主机配置
-# 默认首页
-DirectoryIndex index.html check.php
+# 默认首页（廉价主机只认 index.php）
+DirectoryIndex index.php index.html check.php
 
 # 保护数据文件不被直接下载
 <FilesMatch "\.(json)$">
