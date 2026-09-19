@@ -304,8 +304,24 @@
       "tier": null,
       "createdAt": "2026-09-19T13:15:35.968Z",
       "gameResults": [],
-      "taskResults": [],
-      "errorBook": []
+      "taskResults": [
+        {
+          "taskTier": "C",
+          "taskType": "quiz",
+          "correct": 0,
+          "total": 5,
+          "rate": 0,
+          "wrongWords": [
+            "eye",
+            "haircut"
+          ],
+          "date": "2026-09-19T13:16:32.542Z"
+        }
+      ],
+      "errorBook": [
+        "eye",
+        "haircut"
+      ]
     }
   ],
   "teacherPassword": "7405211"
