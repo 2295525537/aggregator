@@ -151,9 +151,9 @@ function renderQuestion() {
   html += `</div></div>`;
   box.innerHTML = html;
 
-  // Auto-play for listen type
+  // Auto-play for listen type - 仅在用户已解锁音频时自动播放
   if (q.type === 'listen') {
-    setTimeout(() => speak(q.target.word), 400);
+    setTimeout(() => autoSpeak(q.target.word), 400);
   }
 }
 
@@ -166,7 +166,7 @@ function selectOption(btn, word) {
   if (correct) {
     btn.classList.add('correct');
     gameState.correct++;
-    speak('correct'); // subtle feedback (optional)
+    // 不播放 'correct'，避免打断下一题的自动播放
   } else {
     btn.classList.add('wrong');
     btn.classList.add('shake');
@@ -499,7 +499,7 @@ function renderTaskQuestion() {
   html += `</div></div>`;
   box.innerHTML = html;
 
-  if (q.type === 'listen') setTimeout(() => speak(q.target.word), 300);
+  if (q.type === 'listen') setTimeout(() => autoSpeak(q.target.word), 300);
 }
 
 function selectTaskOption(btn, word) {

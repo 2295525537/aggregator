@@ -43,18 +43,209 @@ function pickDistractors(correctWord, count) {
   return shuffle(WORDS.filter(w => w.word !== correctWord.word)).slice(0, count);
 }
 
-// Speak word using Web Speech API
-function speak(text, lang = 'en-US', rate = 0.9) {
+// Speak word using Web Speech API - 增强版
+let cachedVoices = [];
+let voicesReady = false;
+let audioUnlocked = false;
+let _chromeResumeTimer = null;
+let _speakFailCount = 0;
+const SPEAK_MAX_RETRY = 2;
+
+// 标记用户已交互（解锁自动播放）
+function unlockAudio() {
+  audioUnlocked = true;
+  // 移除监听，避免重复
+  document.removeEventListener('click', unlockAudio);
+  document.removeEventListener('touchstart', unlockAudio);
+  document.removeEventListener('keydown', unlockAudio);
+}
+// 页面加载后立即监听用户交互
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    document.addEventListener('click', unlockAudio, { once: true });
+    document.addEventListener('touchstart', unlockAudio, { once: true });
+    document.addEventListener('keydown', unlockAudio, { once: true });
+  });
+} else {
+  document.addEventListener('click', unlockAudio, { once: true });
+  document.addEventListener('touchstart', unlockAudio, { once: true });
+  document.addEventListener('keydown', unlockAudio, { once: true });
+}
+
+// 预加载语音列表（多次尝试，兼容不同浏览器）
+function loadVoices() {
+  if (!('speechSynthesis' in window)) return;
+  try {
+    cachedVoices = window.speechSynthesis.getVoices();
+    if (cachedVoices.length > 0) voicesReady = true;
+  } catch(e) {}
+}
+if ('speechSynthesis' in window) {
+  loadVoices();
+  if (typeof window.speechSynthesis.onvoiceschanged !== 'undefined') {
+    window.speechSynthesis.onvoiceschanged = loadVoices;
+  }
+  // 兜底：部分浏览器 voiceschanged 不触发，定时加载几次
+  let tries = 0;
+  const iv = setInterval(() => {
+    loadVoices();
+    tries++;
+    if (cachedVoices.length > 0 || tries > 10) clearInterval(iv);
+  }, 200);
+}
+
+// 选择合适的英语语音
+function pickEnglishVoice() {
+  if (cachedVoices.length === 0) return null;
+  // 优先选择 en-US，其次 en-GB，再次任何 en 开头的
+  const enUS = cachedVoices.find(v => v.lang === 'en-US' || v.lang === 'en_US');
+  if (enUS) return enUS;
+  const enGB = cachedVoices.find(v => v.lang === 'en-GB' || v.lang === 'en_GB');
+  if (enGB) return enGB;
+  const enAny = cachedVoices.find(v => v.lang.toLowerCase().startsWith('en'));
+  if (enAny) return enAny;
+  // 没有英语语音，返回第一个可用语音
+  return cachedVoices[0] || null;
+}
+
+// 核心播放函数（内部使用，用于异步重试）
+function _speakOnce(text, lang, rate) {
   return new Promise((resolve) => {
     if (!('speechSynthesis' in window)) { resolve(false); return; }
-    window.speechSynthesis.cancel();
+    if (cachedVoices.length === 0) loadVoices();
+
     const u = new SpeechSynthesisUtterance(text);
     u.lang = lang;
     u.rate = rate;
-    u.onend = () => resolve(true);
-    u.onerror = () => resolve(false);
-    window.speechSynthesis.speak(u);
+    u.pitch = 1;
+    u.volume = 1;
+    const voice = pickEnglishVoice();
+    if (voice) u.voice = voice;
+
+    let done = false;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      if (_chromeResumeTimer) { clearInterval(_chromeResumeTimer); _chromeResumeTimer = null; }
+      resolve(ok);
+    };
+    u.onstart = () => {
+      if (_chromeResumeTimer) clearInterval(_chromeResumeTimer);
+      _chromeResumeTimer = setInterval(() => {
+        try { if (window.speechSynthesis.speaking) { window.speechSynthesis.pause(); window.speechSynthesis.resume(); } } catch(e) {}
+      }, 10000);
+    };
+    u.onend = () => finish(true);
+    u.onerror = (e) => {
+      if (e && (e.error === 'interrupted' || e.error === 'canceled')) finish(true);
+      else { console.warn('_speakOnce error:', e); finish(false); }
+    };
+    try {
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(u);
+    } catch(e) { finish(false); }
   });
+}
+
+// 异步重试函数（在 onerror 后调用）
+function retrySpeak(text, lang, rate, attempt, resolve) {
+  if (attempt > SPEAK_MAX_RETRY) {
+    _speakFailCount++;
+    if (_speakFailCount >= 3 && typeof toast === 'function') {
+      toast('发音播放失败，请检查设备音量或刷新页面', 'error');
+    }
+    resolve(false);
+    return;
+  }
+  loadVoices();
+  setTimeout(async () => {
+    const ok = await _speakOnce(text, lang, rate);
+    if (ok) {
+      _speakFailCount = 0;
+      resolve(true);
+    } else {
+      retrySpeak(text, lang, rate, attempt + 1, resolve);
+    }
+  }, 100);
+}
+
+// 对外暴露的 speak：首次同步调用（保持用户手势上下文），失败时异步重试
+function speak(text, lang = 'en-US', rate = 0.85) {
+  return new Promise((resolve) => {
+    if (!('speechSynthesis' in window)) {
+      if (typeof toast === 'function') toast('当前浏览器不支持语音播放', 'error');
+      resolve(false);
+      return;
+    }
+
+    // 确保语音列表已加载
+    if (cachedVoices.length === 0) loadVoices();
+
+    // 同步取消当前播放 + 同步播放（关键：保持在用户手势调用栈中，iOS Safari 必需）
+    try { window.speechSynthesis.cancel(); } catch(e) {}
+
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = lang;
+    u.rate = rate;
+    u.pitch = 1;
+    u.volume = 1;
+
+    const voice = pickEnglishVoice();
+    if (voice) u.voice = voice;
+
+    let done = false;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      if (_chromeResumeTimer) {
+        clearInterval(_chromeResumeTimer);
+        _chromeResumeTimer = null;
+      }
+      if (ok) _speakFailCount = 0;
+      resolve(ok);
+    };
+
+    u.onstart = () => {
+      // Chrome 15s bug 修复：定期 resume 防止被浏览器自动终止
+      if (_chromeResumeTimer) clearInterval(_chromeResumeTimer);
+      _chromeResumeTimer = setInterval(() => {
+        try {
+          if (window.speechSynthesis.speaking) {
+            window.speechSynthesis.pause();
+            window.speechSynthesis.resume();
+          }
+        } catch(e) {}
+      }, 10000);
+    };
+    u.onend = () => finish(true);
+    u.onerror = (e) => {
+      // 'interrupted' 和 'canceled' 是主动取消，不算失败
+      if (e && (e.error === 'interrupted' || e.error === 'canceled')) {
+        finish(true);
+      } else {
+        console.warn('Speech error, retrying:', e);
+        // 首次失败，进入异步重试
+        if (!done) retrySpeak(text, lang, rate, 1, resolve);
+        done = true; // 防止重复 resolve
+      }
+    };
+
+    try {
+      // 同步 resume + speak，保持用户手势上下文
+      window.speechSynthesis.resume();
+      window.speechSynthesis.speak(u);
+    } catch(e) {
+      console.warn('Speak exception, retrying:', e);
+      retrySpeak(text, lang, rate, 1, resolve);
+    }
+  });
+}
+
+// 自动播放（用于题目自动播放）：如果未解锁则不播放，避免被浏览器阻止
+async function autoSpeak(text) {
+  if (!audioUnlocked) return false; // 等用户点击播放按钮
+  return speak(text);
 }
 
 function tierFromRate(rate) {
