@@ -1,17 +1,41 @@
 // Teacher Dashboard
-// API 使用查询字符串传参（兼容所有 PHP 虚拟主机，无需 PATH_INFO 支持）
 const API_BASE = 'api.php?path=';
 let teacherToken = localStorage.getItem('wordgame_teacher_token') || null;
 let allStudents = [];
 let currentFilter = 'all';
+
+// Toast notification
+function toast(msg, type = '') {
+  let el = document.querySelector('.toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = 'toast ' + type;
+  requestAnimationFrame(() => el.classList.add('show'));
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 2500);
+}
 
 async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json' };
   if (teacherToken) headers['Authorization'] = 'Bearer ' + teacherToken;
   const realPath = path.replace(/^\/api\//, '');
   const url = API_BASE + realPath;
-  const res = await fetch(url, { headers, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
-  return res.json();
+  try {
+    const res = await fetch(url, { headers, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+    const data = await res.json();
+    if (data.error) {
+      toast(data.error, 'error');
+      return null;
+    }
+    return data;
+  } catch (e) {
+    toast('网络错误，请刷新重试', 'error');
+    return null;
+  }
 }
 
 function logout() {
@@ -23,23 +47,28 @@ function logout() {
 
 async function doLogin() {
   const pwd = document.getElementById('pwdInput').value;
-  if (!pwd) { alert('请输入密码'); return; }
+  const btn = document.querySelector('#view-login .btn-primary');
+  if (!pwd) { toast('请输入密码', 'error'); return; }
+  btn.classList.add('loading');
+  btn.disabled = true;
   const res = await api('/api/teacher/login', { method: 'POST', body: { password: pwd } });
-  if (res.ok) {
+  btn.classList.remove('loading');
+  btn.disabled = false;
+  if (res && res.ok) {
     teacherToken = res.token;
     localStorage.setItem('wordgame_teacher_token', teacherToken);
     document.getElementById('view-login').classList.add('hidden');
     document.getElementById('view-dashboard').classList.remove('hidden');
     loadStats();
+    toast('登录成功', 'success');
   } else {
-    alert(res.error || '登录失败');
     document.getElementById('pwdInput').value = '';
   }
 }
 
 async function loadStats() {
   const stats = await api('/api/teacher/stats');
-  if (stats.error) { logout(); return; }
+  if (!stats) { return; }
 
   document.getElementById('statStudents').textContent = stats.totalStudents;
   document.getElementById('statGames').textContent = stats.totalGames;
@@ -206,12 +235,13 @@ function closeDetail() {
 }
 
 async function updateTier(sid) {
-  const tier = document.getElementById('tierSelect').value || null;
-  if (!tier) { alert('请选择层级'); return; }
-  await api(`/api/students/${sid}/tier`, { method: 'POST', body: { tier } });
-  alert('层级已更新');
-  closeDetail();
-  loadStats();
+  const tier = document.getElementById('tierSelect').value;
+  const res = await api(`/api/students/${sid}/tier`, { method: 'POST', body: { tier } });
+  if (res) {
+    toast(tier ? '层级已更新' : '已重置为未分层', 'success');
+    closeDetail();
+    loadStats();
+  }
 }
 
 // Init

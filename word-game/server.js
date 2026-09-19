@@ -21,6 +21,9 @@ app.use((req, res, next) => {
   next();
 });
 
+// 根路径映射到 index.php（Express 默认只认 index.html）
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, 'index.php')));
+
 // 静态资源：优先从根目录（PHP 虚拟主机结构），再从 public/（Node.js 结构）
 app.use(express.static(path.join(__dirname)));
 app.use(express.static(path.join(__dirname, 'public')));
@@ -175,11 +178,11 @@ app.post('/api/students/:id/task', (req, res) => {
 // Update tier manually (teacher)
 app.post('/api/students/:id/tier', (req, res) => {
   const { tier } = req.body || {};
-  if (!['A', 'B', 'C'].includes(tier)) return res.status(400).json({ error: '层级无效' });
+  if (tier !== '' && !['A', 'B', 'C'].includes(tier)) return res.status(400).json({ error: '层级无效' });
   const db = loadDB();
   const idx = db.students.findIndex(s => s.id === req.params.id);
   if (idx < 0) return res.status(404).json({ error: '未找到学生' });
-  db.students[idx].tier = tier;
+  db.students[idx].tier = tier === '' ? null : tier;
   saveDB(db);
   res.json({ ok: true, student: db.students[idx] });
 });

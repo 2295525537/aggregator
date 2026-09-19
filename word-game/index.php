@@ -68,6 +68,9 @@
       <div class="app-header">
         <h1>🎮 单词闯关</h1>
         <p><span id="gameType"></span> · 第 <span id="gameCounter">0 / 0</span> 题</p>
+        <div class="header-right">
+          <button class="btn btn-ghost" style="color:white;border-color:rgba(255,255,255,0.4)" onclick="quitGame()">← 退出</button>
+        </div>
       </div>
       <div class="progress-bar"><div id="gameProgress" class="progress-fill" style="width:0%"></div></div>
       <div class="card" id="questionBox"></div>
@@ -120,9 +123,38 @@
       <div class="app-header">
         <h1>🔍 AI 小检测</h1>
         <p><span id="tqType"></span> · 第 <span id="tqCounter">0 / 0</span> 题</p>
+        <div class="header-right">
+          <button class="btn btn-ghost" style="color:white;border-color:rgba(255,255,255,0.4)" onclick="quitTaskQuiz()">← 退出</button>
+        </div>
       </div>
       <div class="progress-bar"><div id="tqProgress" class="progress-fill" style="width:0%"></div></div>
       <div class="card" id="tqBox"></div>
+    </div>
+
+    <!-- Task Quiz Result -->
+    <div id="view-tqresult" class="view hidden">
+      <div class="app-header">
+        <h1>✅ 小检测完成</h1>
+        <p>AI 已自动批改，答错单词已收录错题本</p>
+        <div class="header-right">
+          <button class="btn btn-ghost" style="color:white;border-color:rgba(255,255,255,0.4)" onclick="showTasks()">← 返回任务</button>
+        </div>
+      </div>
+      <div class="card" style="text-align:center">
+        <div id="tqResultCircle" class="result-circle" style="background:linear-gradient(135deg,#6c5ce7,#a29bfe)">
+          <span id="tqResultRate">0%</span>
+        </div>
+        <div style="font-size:18px;margin-bottom:8px">正确题数：<strong id="tqResultCorrect">0 / 0</strong></div>
+        <div class="hidden" id="tqWrongSection" style="margin-top:16px">
+          <h4 style="margin-bottom:8px">❌ 答错的单词</h4>
+          <div id="tqWrongWords"></div>
+        </div>
+        <div style="margin-top:20px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+          <button class="btn btn-primary" onclick="showErrorBook()">查看错题本 📕</button>
+          <button class="btn btn-outline" onclick="showTasks()">返回任务单</button>
+          <button class="btn btn-ghost" onclick="showMenu()">返回主页</button>
+        </div>
+      </div>
     </div>
 
     <!-- Error Book -->

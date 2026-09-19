@@ -1,25 +1,50 @@
 // AI Word Game - Student App
-// API 使用查询字符串传参（兼容所有 PHP 虚拟主机，无需 PATH_INFO 支持）
 const API_BASE = 'api.php?path=';
 let currentStudent = JSON.parse(localStorage.getItem('wordgame_student') || 'null');
 let gameState = null;
+
+// ---------- Toast notification ----------
+function toast(msg, type = '') {
+  let el = document.querySelector('.toast');
+  if (!el) {
+    el = document.createElement('div');
+    el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.className = 'toast ' + type;
+  requestAnimationFrame(() => el.classList.add('show'));
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 2500);
+}
 
 // ---------- API helpers ----------
 async function api(path, opts = {}) {
   const realPath = path.replace(/^\/api\//, '');
   const url = API_BASE + realPath;
-  const res = await fetch(url, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-    body: opts.body ? JSON.stringify(opts.body) : undefined
-  });
-  return res.json();
+  try {
+    const res = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+      ...opts,
+      body: opts.body ? JSON.stringify(opts.body) : undefined
+    });
+    const data = await res.json();
+    if (data.error) {
+      toast(data.error, 'error');
+      return null;
+    }
+    return data;
+  } catch (e) {
+    toast('网络错误，请检查连接后重试', 'error');
+    return null;
+  }
 }
 
 // ---------- Views ----------
 function showView(viewId) {
   document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
-  document.getElementById(viewId).classList.remove('hidden');
+  const el = document.getElementById(viewId);
+  if (el) el.classList.remove('hidden');
   window.scrollTo(0, 0);
 }
 
@@ -31,10 +56,15 @@ function renderHeader() {
 // ---------- Welcome / Register ----------
 async function registerStudent() {
   const input = document.getElementById('nameInput');
+  const btn = input.nextElementSibling;
   const name = input.value.trim();
-  if (!name) { alert('请输入你的姓名'); return; }
+  if (!name) { toast('请输入你的姓名', 'error'); return; }
+  btn.classList.add('loading');
+  btn.disabled = true;
   const stu = await api('/api/students', { method: 'POST', body: { name } });
-  if (stu.error) { alert(stu.error); return; }
+  btn.classList.remove('loading');
+  btn.disabled = false;
+  if (!stu) return;
   currentStudent = stu;
   localStorage.setItem('wordgame_student', JSON.stringify(stu));
   renderHeader();
@@ -77,6 +107,13 @@ function startGame() {
   renderQuestion();
 }
 
+function quitGame() {
+  if (confirm('确定要退出当前闯关吗？进度将不会保存。')) {
+    gameState = null;
+    showMenu();
+  }
+}
+
 function renderQuestion() {
   const q = gameState.questions[gameState.current];
   const total = gameState.questions.length;
@@ -108,7 +145,7 @@ function renderQuestion() {
   }
 
   html += `<div class="options-grid">`;
-  q.options.forEach((opt, i) => {
+  q.options.forEach((opt) => {
     html += `<button class="option-btn" data-word="${opt.word}" onclick="selectOption(this, '${opt.word}')">${opt.word}</button>`;
   });
   html += `</div></div>`;
@@ -122,17 +159,17 @@ function renderQuestion() {
 
 function selectOption(btn, word) {
   const q = gameState.questions[gameState.current];
-  const buttons = document.querySelectorAll('.option-btn');
+  const buttons = document.querySelectorAll('#questionBox .option-btn');
   buttons.forEach(b => b.disabled = true);
 
   const correct = word === q.target.word;
   if (correct) {
     btn.classList.add('correct');
     gameState.correct++;
+    speak('correct'); // subtle feedback (optional)
   } else {
     btn.classList.add('wrong');
-    btn.parentElement.classList.add('shake');
-    // highlight correct
+    btn.classList.add('shake');
     buttons.forEach(b => {
       if (b.dataset.word === q.target.word) b.classList.add('correct');
     });
@@ -161,8 +198,10 @@ async function finishGame() {
     method: 'POST',
     body: { correct, total, wrongWords: gameState.wrongWords }
   });
-  currentStudent = result.student;
-  localStorage.setItem('wordgame_student', JSON.stringify(currentStudent));
+  if (result && result.student) {
+    currentStudent = result.student;
+    localStorage.setItem('wordgame_student', JSON.stringify(currentStudent));
+  }
 
   // Render result
   const color = tier === 'A' ? '#00b894' : tier === 'B' ? '#fdcb6e' : '#e17055';
@@ -188,12 +227,13 @@ async function finishGame() {
   }
 
   showView('view-result');
+  toast('闯关完成！AI 已为你分层 🎉', 'success');
 }
 
 // ---------- Task Sheet ----------
 function showTasks() {
   if (!currentStudent.tier) {
-    alert('请先完成单词闯关，AI 将为你分层并推送任务');
+    toast('请先完成单词闯关，AI 将为你分层并推送任务', 'error');
     return;
   }
   const tasks = getTasks(currentStudent.tier);
@@ -232,6 +272,7 @@ function renderTasks(tasks) {
       inner += `<div class="word-list">`;
       sec.words.forEach(w => {
         inner += `<div class="word-item">
+          <button class="speaker" onclick="speak('${w.word}')">🔊</button>
           <div><div class="w-en">${w.word}</div><div class="w-cn">${w.meaning}</div></div>
         </div>`;
       });
@@ -243,7 +284,7 @@ function renderTasks(tasks) {
         inner += `<div class="task-question">
           <div class="q-text">${s.en}</div>
           <div style="color:var(--text-light);font-size:14px">${s.cn}</div>
-          <button class="btn btn-ghost" style="margin-top:8px;padding:6px 14px" onclick="speak('${s.en.replace('___',s.answer)}')">🔊 跟读</button>
+          <button class="btn btn-ghost btn-small" style="margin-top:8px" onclick="speak('${s.en.replace('___',s.answer)}')">🔊 跟读</button>
         </div>`;
       });
       inner += `</div>`;
@@ -257,7 +298,7 @@ function renderTasks(tasks) {
           <div style="color:var(--text-light);font-size:13px;margin-bottom:8px">${it.cn}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">`;
         opts.forEach(o => {
-          inner += `<button class="btn btn-outline" style="padding:6px 14px" onclick="checkFill(this,'${o}','${it.answer}')">${o}</button>`;
+          inner += `<button class="btn btn-outline btn-small" data-word="${o}" onclick="checkFill(this,'${o}','${it.answer}')">${o}</button>`;
         });
         inner += `</div></div>`;
       });
@@ -268,7 +309,7 @@ function renderTasks(tasks) {
       sec.words.forEach(w => {
         inner += `<div class="task-question">
           <div class="q-text">${w.word}</div>
-          <input class="input" style="max-width:300px" placeholder="写出中文意思" onchange="this.dataset.answer='${w.meaning}';checkTranslate(this,'${w.meaning}')">
+          <input class="input" style="max-width:300px" placeholder="写出中文意思" onchange="checkTranslate(this,'${w.meaning}')">
         </div>`;
       });
       inner += `</div>`;
@@ -341,6 +382,7 @@ function matchSelect(el) {
       matchSelected.classList.remove('selected');
       matchSelected.classList.add('matched');
       el.classList.add('matched');
+      toast('匹配正确！', 'success');
     } else {
       matchSelected.classList.remove('selected');
       el.classList.add('shake');
@@ -359,7 +401,12 @@ function checkFill(btn, chosen, answer) {
   } else {
     btn.classList.remove('btn-outline');
     btn.classList.add('btn-danger');
-    btns.forEach(b => { if (b.textContent === answer) { b.classList.remove('btn-outline'); b.classList.add('btn-success'); } });
+    btns.forEach(b => {
+      if (b.dataset.word === answer) {
+        b.classList.remove('btn-outline');
+        b.classList.add('btn-success');
+      }
+    });
   }
 }
 
@@ -374,10 +421,12 @@ function checkTranslate(input, answer) {
   }
 }
 
-// Pronunciation practice (mock - uses speech synthesis, records via browser if available)
+// Pronunciation practice
 function startPronunciationPractice(wordsStr) {
   const words = wordsStr.split(',');
-  alert(`🎤 跟读练习：\n\n请依次大声朗读以下单词，AI 正在监听发音...\n\n${words.join(', ')}\n\n（浏览器语音识别功能模拟中，实际部署可接入语音识别 API）`);
+  toast('请大声朗读单词，注意发音口型 🎤', 'success');
+  // Auto-speak first word to demo
+  if (words.length > 0) speak(words[0]);
 }
 
 // Task quiz
@@ -387,7 +436,6 @@ function startTaskQuiz(tier, quizType, count) {
   for (let i = 0; i < count; i++) {
     if (quizType === 'listen') questions.push(genListenQuestion());
     else if (quizType === 'sentence') {
-      // sentence-based question
       const sentences = [
         { en: 'I have a big ___ .', answer: 'nose', meaning: '鼻子' },
         { en: 'She has ___ hair.', answer: 'long', meaning: '长的' },
@@ -418,6 +466,13 @@ function startTaskQuiz(tier, quizType, count) {
   renderTaskQuestion();
 }
 
+function quitTaskQuiz() {
+  if (confirm('确定要退出小检测吗？')) {
+    taskQuizState = null;
+    showTasks();
+  }
+}
+
 function renderTaskQuestion() {
   const q = taskQuizState.questions[taskQuizState.current];
   const total = taskQuizState.questions.length;
@@ -439,7 +494,7 @@ function renderTaskQuestion() {
   }
   html += `<div class="options-grid">`;
   q.options.forEach(opt => {
-    html += `<button class="option-btn" onclick="selectTaskOption(this,'${opt.word}')">${opt.word}</button>`;
+    html += `<button class="option-btn" data-word="${opt.word}" onclick="selectTaskOption(this,'${opt.word}')">${opt.word}</button>`;
   });
   html += `</div></div>`;
   box.innerHTML = html;
@@ -455,7 +510,7 @@ function selectTaskOption(btn, word) {
   if (correct) { btn.classList.add('correct'); taskQuizState.correct++; }
   else {
     btn.classList.add('wrong');
-    buttons.forEach(b => { if (b.textContent === q.target.word) b.classList.add('correct'); });
+    buttons.forEach(b => { if (b.dataset.word === q.target.word) b.classList.add('correct'); });
     taskQuizState.wrongWords.push(q.target.word);
   }
   setTimeout(() => {
@@ -479,18 +534,36 @@ async function finishTaskQuiz() {
   });
   // Update local student
   const stu = await api(`/api/students/${currentStudent.id}`);
-  currentStudent = stu;
-  localStorage.setItem('wordgame_student', JSON.stringify(stu));
+  if (stu) {
+    currentStudent = stu;
+    localStorage.setItem('wordgame_student', JSON.stringify(stu));
+  }
 
-  alert(`🎉 小检测完成！\n\n得分：${correct} / ${total} (${Math.round(correct/total*100)}%)\n\n答错的单词已自动收录到你的错题本`);
-  showTasks();
+  // Render quiz result
+  document.getElementById('tqResultRate').textContent = Math.round(correct/total*100) + '%';
+  document.getElementById('tqResultCorrect').textContent = `${correct} / ${total}`;
+  const tqWrong = document.getElementById('tqWrongWords');
+  if (taskQuizState.wrongWords.length > 0) {
+    const unique = [...new Set(taskQuizState.wrongWords)];
+    tqWrong.innerHTML = unique.map(w => {
+      const wd = WORD_MAP[w];
+      return `<span class="word-item" style="display:inline-flex;margin:4px"><span class="w-en">${w}</span> <span class="w-cn">${wd ? wd.meaning : ''}</span></span>`;
+    }).join('');
+    tqWrong.parentElement.classList.remove('hidden');
+  } else {
+    tqWrong.parentElement.classList.add('hidden');
+  }
+  showView('view-tqresult');
+  toast('小检测完成！答错的单词已收录到错题本 📕', 'success');
 }
 
 // ---------- Error Book ----------
 async function showErrorBook() {
   const stu = await api(`/api/students/${currentStudent.id}`);
-  currentStudent = stu;
-  const errors = stu.errorBook || [];
+  if (stu) {
+    currentStudent = stu;
+  }
+  const errors = (currentStudent && currentStudent.errorBook) || [];
   const list = document.getElementById('errorBookList');
   if (errors.length === 0) {
     list.innerHTML = `<div class="empty-state"><div class="emoji">🎉</div><p>太棒了！你还没有错题</p></div>`;
@@ -523,9 +596,12 @@ function logout() {
 
 // ---------- Init ----------
 function init() {
-  document.getElementById('nameInput').addEventListener('keydown', e => {
-    if (e.key === 'Enter') registerStudent();
-  });
+  const input = document.getElementById('nameInput');
+  if (input) {
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') registerStudent();
+    });
+  }
   if (currentStudent) {
     showMenu();
   } else {

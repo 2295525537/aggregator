@@ -153,11 +153,11 @@ if ($method === 'POST' && count($segments) === 3 && $segments[0] === 'students' 
                 if (!in_array($w, $s['errorBook'])) $s['errorBook'][] = $w;
             }
             $found = true;
+            saveDB($db);
             json_out(['ok'=>true, 'tier'=>$tier, 'rate'=>$rate, 'student'=>$s]);
         }
     }
     if (!$found) json_out(['error'=>'未找到学生'], 404);
-    saveDB($db);
 }
 
 // POST /students/{id}/task
@@ -197,12 +197,12 @@ if ($method === 'POST' && count($segments) === 3 && $segments[0] === 'students' 
     $id = $segments[1];
     $input = getInput();
     $tier = isset($input['tier']) ? $input['tier'] : '';
-    if (!in_array($tier, ['A','B','C'])) json_out(['error'=>'层级无效'], 400);
+    if ($tier !== '' && !in_array($tier, ['A','B','C'])) json_out(['error'=>'层级无效'], 400);
     $db = loadDB();
     $found = false;
     foreach ($db['students'] as &$s) {
         if ($s['id'] === $id) {
-            $s['tier'] = $tier;
+            $s['tier'] = $tier === '' ? null : $tier;
             $found = true;
             saveDB($db);
             json_out(['ok'=>true, 'student'=>$s]);
