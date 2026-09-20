@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
+  <button class="bgm-btn" id="bgmBtn" onclick="toggleBgm()" title="点击开关背景音乐">🎵</button>
   <!-- Login -->
   <div id="view-login" class="login-wrap">
     <div class="login-card">
