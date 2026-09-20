@@ -30,21 +30,21 @@
 
 4. 浏览器访问：
    学生端：  http://你的域名/
-   教师后台：http://你的域名/dashboard.html
+   教师后台：http://你的域名/dashboard.php
    教师密码：7405211
 
 ========================================
 【文件说明】
-  index.html        学生端页面
-  dashboard.html    教师后台页面
+  index.php         学生端页面
+  dashboard.php     教师后台页面
   api.php           PHP 后端接口（虚拟主机核心文件）
   server.js         Node.js 后端（仅 Node.js 部署需要）
   package.json      Node.js 依赖（仅 Node.js 部署需要）
   .htaccess         Apache 配置（保护数据目录）
   start.bat         Windows 一键启动（Node.js 方式）
   start.sh          Mac/Linux 启动脚本（Node.js 方式）
-  public/css/       样式文件
-  public/js/        前端逻辑
+  css/              样式文件
+  js/               前端逻辑
   data/             数据存储目录（需写入权限）
 
 ========================================
@@ -68,3 +68,28 @@ A: 确认密码为 7405211，检查 api.php 是否可正常访问
 
 Q: 想清空所有数据？
 A: 删除 data/db.json 文件，刷新页面会自动重建
+
+Q: 上传后访问提示 403 Forbidden？
+A: 常见原因与解决方案（按顺序排查）：
+   1) 优先访问 http://你的域名/check.php
+      - 能打开说明 PHP 工作正常，问题在 .htaccess
+      - 也 403 说明是文件权限/所有者问题（见下面第 3 条）
+   2) .htaccess 兼容性问题：本项目已用 IfModule 包裹兼容
+      Apache 2.2/2.4。若主机 AllowOverride 限制严格，可临时
+      将根目录 .htaccess 改名为 .htaccess.bak 测试；若恢复访问，
+      说明主机不支持 .htaccess，可保留备份名（会失去数据目录
+      保护，但功能可用）。
+   3) 文件权限不对：FTP 上传后用主机面板或 SSH 修正
+      - 目录权限： 755 (rwxr-xr-x)
+      - 文件权限： 644 (rw-r--r--)
+      - data 目录需要可写：755 或 777
+   4) 文件所有者不对：通过虚拟主机面板"修复权限/所有权"功能
+      或联系主机商，让所有文件归属于 Web 服务用户
+      （如 www-data / nginx / apache）。
+   5) 域名根目录指向错误：在虚拟主机面板确认"网站根目录"
+      指向了上传 word-game 文件夹的"内部"（即包含 index.php
+      的那一层）。如果指向了上一级，就会 403。
+
+Q: 上传后页面空白或报 500 内部错误？
+A: 检查 api.php 是否完整上传；在虚拟主机面板开启 PHP 错误
+   显示，或查看 error_log 文件定位原因。
