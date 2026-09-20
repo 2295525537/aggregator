@@ -12,9 +12,9 @@
     <div id="view-welcome" class="view">
       <div class="login-wrap" style="min-height:auto;padding:60px 0">
         <div class="login-card">
-          <div style="font-size:60px;margin-bottom:12px">🎮</div>
+          <div class="deco-emoji">🎮</div>
           <h1>AI 单词闯关</h1>
-          <p class="subtitle">Unit 3 · Body & Appearance<br>完成闯关，AI 自动分层推送个性化任务</p>
+          <p class="subtitle">Unit 3 · Body &amp; Appearance<br>完成闯关，AI 自动分层推送个性化任务</p>
           <input id="nameInput" class="input" placeholder="请输入你的姓名" autofocus>
           <button class="btn btn-primary btn-block" style="margin-top:16px" onclick="registerStudent()">开始闯关</button>
           <p style="margin-top:20px;font-size:13px;color:var(--text-light)">

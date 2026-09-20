@@ -10,7 +10,7 @@
   <!-- Login -->
   <div id="view-login" class="login-wrap">
     <div class="login-card">
-      <div style="font-size:60px;margin-bottom:12px">👨‍🏫</div>
+      <div class="deco-emoji">👨‍🏫</div>
       <h1>教师后台</h1>
       <p class="subtitle">AI 单词闯关 · 实时学情仪表盘</p>
       <input id="pwdInput" type="password" class="input" placeholder="请输入登录密码" autofocus>
