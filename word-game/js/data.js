@@ -43,21 +43,70 @@ function pickDistractors(correctWord, count) {
   return shuffle(WORDS.filter(w => w.word !== correctWord.word)).slice(0, count);
 }
 
-// Speak word - Audio 有道TTS优先（手机兼容性最好），Web Speech 备用
-let cachedVoices = [];
-let audioUnlocked = false;
-let _speakFailCount = 0;
-let _audioCache = {};
-let _activeAudio = null; // 当前正在播放的Audio（用于cancel）
+// Speak word - 多源 TTS + Web Speech 综合方案
+// 核心思路：
+// 1. 用户首次交互时，同步播放一段静音音频来"解锁" Audio 元素（iOS 必需）
+// 2. playWord 同步调用 audio.play()，浏览器会等待加载完后自动播放
+// 3. 加载超时兜底切换到下一个 TTS 源
+var cachedVoices = [];
+var audioUnlocked = false;
+var _speakFailCount = 0;
 
-// 标记用户已交互（解锁自动播放）
+// 内嵌极短的静音 WAV（44 字节头部 + 少量静音数据）用于解锁 Audio
+// 同源 data URL，iOS Safari 也能播放
+var _silentWav = 'data:audio/wav;base64,UklGRkwAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSgAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA';
+
+// 全局 Audio 元素（复用同一个，避免 iOS 创建多个 Audio 的限制）
+var _ttsAudio = null;
+function _getTtsAudio() {
+  if (!_ttsAudio) {
+    try {
+      _ttsAudio = new Audio();
+      // iOS 必须 playsinline 才能在网页内播放
+      _ttsAudio.setAttribute('playsinline', 'playsinline');
+      _ttsAudio.setAttribute('webkit-playsinline', 'webkit-playsinline');
+      _ttsAudio.preload = 'auto';
+    } catch(e) { return null; }
+  }
+  return _ttsAudio;
+}
+
+// TTS 源列表（按优先级排序）
+function _getTtsUrls(text) {
+  return [
+    'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=2',
+    'https://fanyi.baidu.com/gettts?lan=en&text=' + encodeURIComponent(text) + '&spd=3&source=web',
+    'https://tts.baidu.com/text2audio?lan=EN&text=' + encodeURIComponent(text) + '&spd=3&per=4'
+  ];
+}
+
+// 用户首次交互时调用：在同步手势上下文中播放静音音频以"解锁" Audio 元素
+// iOS Safari 必须：任何 audio.play() 必须直接在用户手势回调内同步执行过一次
 function unlockAudio() {
+  if (audioUnlocked) return;
   audioUnlocked = true;
   document.removeEventListener('click', unlockAudio);
   document.removeEventListener('touchstart', unlockAudio);
   document.removeEventListener('keydown', unlockAudio);
-  // 用户首次交互后，尝试启动背景音乐
-  if (typeof initBgm === 'function') initBgm();
+
+  // ★ 关键：同步 play() 静音 WAV，让 Audio 元素被"激活"
+  var a = _getTtsAudio();
+  if (a) {
+    try {
+      a.src = _silentWav;
+      a.volume = 0; // 静音不扰民
+      var p = a.play();
+      var afterUnlock = function() {
+        try { if (typeof initBgm === 'function') initBgm(); } catch(e) {}
+      };
+      if (p && p.then) p.then(afterUnlock).catch(afterUnlock);
+      else afterUnlock();
+    } catch(e) {
+      try { if (typeof initBgm === 'function') initBgm(); } catch(e2) {}
+    }
+  } else {
+    try { if (typeof initBgm === 'function') initBgm(); } catch(e) {}
+  }
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', function() {
@@ -71,12 +120,10 @@ if (document.readyState === 'loading') {
   document.addEventListener('keydown', unlockAudio, { once: true });
 }
 
-// 预加载语音列表
+// 预加载语音列表（Web Speech 备用方案）
 function loadVoices() {
   if (!('speechSynthesis' in window)) return;
-  try {
-    cachedVoices = window.speechSynthesis.getVoices();
-  } catch(e) {}
+  try { cachedVoices = window.speechSynthesis.getVoices(); } catch(e) {}
 }
 if ('speechSynthesis' in window) {
   loadVoices();
@@ -91,7 +138,6 @@ if ('speechSynthesis' in window) {
   }, 200);
 }
 
-// 选择英语语音
 function pickEnglishVoice() {
   if (cachedVoices.length === 0) return null;
   var enUS = cachedVoices.find(function(v) { return v.lang === 'en-US' || v.lang === 'en_US'; });
@@ -99,53 +145,7 @@ function pickEnglishVoice() {
   var enGB = cachedVoices.find(function(v) { return v.lang === 'en-GB' || v.lang === 'en_GB'; });
   if (enGB) return enGB;
   var enAny = cachedVoices.find(function(v) { return v.lang.toLowerCase().startsWith('en'); });
-  if (enAny) return enAny;
-  return null;
-}
-
-// 有道 TTS Audio 播放（在用户手势上下文中同步调用，手机兼容性最好）
-function _playYoudaoTTS(text) {
-  return new Promise(function(resolve) {
-    try {
-      // 停止上一个正在播放的 Audio
-      if (_activeAudio) {
-        try { _activeAudio.pause(); } catch(e) {}
-      }
-      var url = 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=2';
-      var audio = _audioCache[text];
-      if (!audio) {
-        audio = new Audio(url);
-        audio.crossOrigin = 'anonymous';
-        _audioCache[text] = audio;
-      }
-      _activeAudio = audio;
-      audio.currentTime = 0;
-      audio.volume = 1;
-      audio.playbackRate = 0.9;
-
-      var done = false;
-      var finish = function(ok) {
-        if (done) return;
-        done = true;
-        _activeAudio = null;
-        resolve(ok);
-      };
-
-      audio.onended = function() { finish(true); };
-      audio.onerror = function() { finish(false); };
-      audio.play().then(function() {
-        // 播放成功，等待 onended
-      }).catch(function(e) {
-        // play() 被拒绝，可能跨域或自动播放限制
-        finish(false);
-      });
-
-      // 8 秒超时保底
-      setTimeout(function() { finish(false); }, 8000);
-    } catch(e) {
-      resolve(false);
-    }
-  });
+  return enAny || null;
 }
 
 // Web Speech API 播放（备用方案）
@@ -154,7 +154,6 @@ function _speakWithWebSpeech(text, lang, rate) {
     if (!('speechSynthesis' in window)) { resolve(false); return; }
     if (cachedVoices.length === 0) loadVoices();
     try { window.speechSynthesis.cancel(); } catch(e) {}
-
     var u = new SpeechSynthesisUtterance(text);
     u.lang = lang || 'en-US';
     u.rate = rate || 0.85;
@@ -162,57 +161,138 @@ function _speakWithWebSpeech(text, lang, rate) {
     u.volume = 1;
     var voice = pickEnglishVoice();
     if (voice) u.voice = voice;
-
     var done = false;
-    var finish = function(ok) {
-      if (done) return;
-      done = true;
-      resolve(ok);
-    };
+    var finish = function(ok) { if (done) return; done = true; resolve(ok); };
     u.onend = function() { finish(true); };
     u.onerror = function(e) {
       if (e && (e.error === 'interrupted' || e.error === 'canceled')) finish(true);
       else finish(false);
     };
-    try {
-      window.speechSynthesis.resume();
-      window.speechSynthesis.speak(u);
-    } catch(e) { finish(false); }
-    // 5 秒超时
+    try { window.speechSynthesis.resume(); window.speechSynthesis.speak(u); }
+    catch(e) { finish(false); }
     setTimeout(function() { finish(false); }, 5000);
   });
 }
 
-// 对外暴露的 speak：Audio 优先（手机兼容性最好），Web Speech 备用
+// 对外暴露的 speak（异步，用于自动播放等场景）
 function speak(text, lang, rate) {
-  // 先尝试有道 TTS Audio（在用户手势上下文中同步创建，iOS/Android 兼容）
-  return _playYoudaoTTS(text).then(function(ok) {
-    if (ok) { _speakFailCount = 0; return true; }
-    // Audio 失败，回退到 Web Speech API
-    return _speakWithWebSpeech(text, lang, rate).then(function(wsOk) {
-      if (wsOk) { _speakFailCount = 0; return true; }
-      _speakFailCount++;
-      if (_speakFailCount >= 3 && typeof toast === 'function') {
-        toast('发音播放失败，请检查网络和设备音量', 'error');
-      }
-      return false;
-    });
-  });
+  lang = lang || 'en-US';
+  rate = rate || 0.85;
+  return _speakWithWebSpeech(text, lang, rate);
 }
 
-// 自动播放：仅在用户已交互时播放
+// 自动播放
 function autoSpeak(text) {
   if (!audioUnlocked) return Promise.resolve(false);
   return speak(text);
 }
 
-// 带动画反馈的播放（用于按钮 onclick）
+// ★ 核心函数：用户点击播放按钮时调用
+// 关键：audio.play() 在同步调用栈中执行（iOS Safari 必须在用户手势内）
+// 已在 unlockAudio 时通过静音 WAV 解锁过 Audio 元素
 function playWord(text, btn) {
+  // 1. 视觉动画反馈（即使播放失败也有效）
   if (btn) {
     btn.classList.add('speaking');
-    setTimeout(function() { btn.classList.remove('speaking'); }, 600);
+    setTimeout(function() { btn.classList.remove('speaking'); }, 1500);
   }
-  return speak(text);
+
+  // 2. 同步调用 audio.play()（保持在用户手势上下文中）
+  var audio = _getTtsAudio();
+  if (!audio) {
+    _speakWithWebSpeech(text, 'en-US', 0.85);
+    return;
+  }
+
+  var urls = _getTtsUrls(text);
+  var sourceIdx = 0;
+  var loadTimeout = null;
+  var settled = false;
+
+  // 清理：取消之前的加载超时、重置事件
+  function _cleanup() {
+    if (loadTimeout) { clearTimeout(loadTimeout); loadTimeout = null; }
+    audio.oncanplay = null;
+    audio.onended = null;
+    audio.onerror = null;
+  }
+
+  // 切换到下一个 TTS 源（在异步上下文中调用）
+  function _tryNextSource(reason) {
+    if (settled) return;
+    settled = true;
+    _cleanup();
+    sourceIdx++;
+    if (sourceIdx < urls.length) {
+      // 尝试下一个 TTS 源 - 注意此时已脱离用户手势上下文
+      // 但因为 Audio 元素已被 unlockAudio 解锁，仍可正常播放
+      audio.src = urls[sourceIdx];
+      audio.currentTime = 0;
+      audio.volume = 1;
+      _attachEvents();
+      var p2 = audio.play();
+      if (p2 && p2.catch) p2.catch(function() { _tryWebSpeechFallback(text); });
+    } else {
+      // 所有 TTS 源都失败，回退 Web Speech
+      _tryWebSpeechFallback(text);
+    }
+  }
+
+  // 绑定事件
+  function _attachEvents() {
+    // 加载超时兜底（防止网络慢或跨域被拦导致一直不响应）
+    if (loadTimeout) clearTimeout(loadTimeout);
+    loadTimeout = setTimeout(function() {
+      // 2.5 秒还没到可播放状态，切换源
+      if (audio.readyState < 3) { // HAVE_FUTURE_DATA = 3
+        _tryNextSource('load-timeout');
+      }
+    }, 2500);
+
+    audio.oncanplay = function() {
+      // 加载到可播放状态，清除超时
+      if (loadTimeout) { clearTimeout(loadTimeout); loadTimeout = null; }
+    };
+
+    audio.onended = function() {
+      _speakFailCount = 0;
+      _cleanup();
+    };
+
+    audio.onerror = function() {
+      _tryNextSource('onerror');
+    };
+  }
+
+  // 设置第一个 TTS 源并同步播放
+  audio.src = urls[0];
+  audio.currentTime = 0;
+  audio.volume = 1;
+  _attachEvents();
+
+  // 同步调用 play()（iOS 必须在用户手势的直接调用栈中）
+  // 浏览器会等待音频加载完成后自动开始播放
+  var promise = audio.play();
+  if (promise && promise.catch) {
+    promise.catch(function() {
+      // play() 被拒绝（可能是自动播放策略），尝试下一个源
+      _tryNextSource('play-rejected');
+    });
+  }
+}
+
+// Web Speech 回退
+function _tryWebSpeechFallback(text) {
+  _speakWithWebSpeech(text, 'en-US', 0.85).then(function(ok) {
+    if (!ok) {
+      _speakFailCount++;
+      if (_speakFailCount >= 3 && typeof toast === 'function') {
+        toast('发音播放失败，请检查网络和设备音量', 'error');
+      }
+    } else {
+      _speakFailCount = 0;
+    }
+  });
 }
 
 function tierFromRate(rate) {
@@ -494,16 +574,38 @@ function _bgmTick() {
 }
 
 // 初始化背景音乐（用户首次交互后调用）
+// 自动启动 BGM，让用户打开网页就有欢快音乐（用户希望"页面整体加一点欢快的音乐"）
 function initBgm() {
   if (_bgmCtx) {
     // 如果之前暂停过，恢复
     if (_bgmCtx.state === 'suspended') _bgmCtx.resume();
+    // 如果用户没主动关闭过，自动开始播放
+    if (!_bgmPlaying && !_bgmUserStopped) {
+      _startBgm();
+    }
     return;
   }
   _bgmInitCtx();
+  // 首次初始化后，自动开始播放
+  if (_bgmCtx && !_bgmPlaying && !_bgmUserStopped) {
+    _startBgm();
+  }
 }
 
-// 切换播放/暂停
+// 标记用户是否主动关闭过 BGM（避免自动播放打扰用户）
+var _bgmUserStopped = false;
+
+// 开始播放 BGM
+function _startBgm() {
+  if (!_bgmCtx || _bgmPlaying) return;
+  _bgmPlaying = true;
+  if (_bgmCtx.state === 'suspended') _bgmCtx.resume();
+  _bgmTick();
+  var btn = document.getElementById('bgmBtn');
+  if (btn) { btn.classList.add('playing'); btn.innerHTML = '🔊 音乐'; }
+}
+
+// 切换播放/暂停（用户手动控制）
 function toggleBgm() {
   var btn = document.getElementById('bgmBtn');
   if (!_bgmCtx) _bgmInitCtx();
@@ -512,14 +614,13 @@ function toggleBgm() {
   if (_bgmPlaying) {
     // 暂停
     _bgmPlaying = false;
+    _bgmUserStopped = true; // 用户主动关闭，之后不再自动启动
     if (_bgmTimer) { clearTimeout(_bgmTimer); _bgmTimer = null; }
     if (_bgmCtx.state === 'running') _bgmCtx.suspend();
     if (btn) { btn.classList.remove('playing'); btn.innerHTML = '🎵 音乐'; }
   } else {
     // 播放
-    _bgmPlaying = true;
-    if (_bgmCtx.state === 'suspended') _bgmCtx.resume();
-    _bgmTick();
-    if (btn) { btn.classList.add('playing'); btn.innerHTML = '🎵 音乐'; }
+    _bgmUserStopped = false;
+    _startBgm();
   }
 }
