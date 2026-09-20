@@ -1,0 +1,13 @@
+{
+    "students": [
+        {
+            "id": "stu_1789876621_fad956",
+            "name": "test",
+            "tier": null,
+            "createdAt": "2026-09-20T03:57:01+00:00",
+            "gameResults": [],
+            "taskResults": [],
+            "errorBook": []
+        }
+    ]
+}

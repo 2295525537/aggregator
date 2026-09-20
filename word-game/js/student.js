@@ -130,7 +130,7 @@ function renderQuestion() {
     html += `
       <div class="question-text">🔊 ${q.target.meaning}</div>
       <div class="question-hint">${q.hint}</div>
-      <button class="btn btn-primary" onclick="speak('${q.target.word}')" style="margin-bottom:20px">
+      <button class="btn btn-primary" onclick="playWord('${q.target.word}',this)" style="margin-bottom:20px">
         🔊 播放发音
       </button>`;
   } else if (q.type === 'picture') {
@@ -256,7 +256,7 @@ function renderTasks(tasks) {
       inner += `<div class="word-list">`;
       sec.words.forEach(w => {
         inner += `<div class="word-item">
-          <button class="speaker" onclick="speak('${w.word}')">🔊</button>
+          <button class="speaker" onclick="playWord('${w.word}',this)">🔊</button>
           <div><div class="w-en">${w.word}</div><div class="w-cn">${w.meaning}</div></div>
         </div>`;
       });
@@ -272,7 +272,7 @@ function renderTasks(tasks) {
       inner += `<div class="word-list">`;
       sec.words.forEach(w => {
         inner += `<div class="word-item">
-          <button class="speaker" onclick="speak('${w.word}')">🔊</button>
+          <button class="speaker" onclick="playWord('${w.word}',this)">🔊</button>
           <div><div class="w-en">${w.word}</div><div class="w-cn">${w.meaning}</div></div>
         </div>`;
       });
@@ -284,7 +284,7 @@ function renderTasks(tasks) {
         inner += `<div class="task-question">
           <div class="q-text">${s.en}</div>
           <div style="color:var(--text-light);font-size:14px">${s.cn}</div>
-          <button class="btn btn-ghost btn-small" style="margin-top:8px" onclick="speak('${s.en.replace('___',s.answer)}')">🔊 跟读</button>
+          <button class="btn btn-ghost btn-small" style="margin-top:8px" onclick="playWord('${s.en.replace('___',s.answer)}',this)">🔊 跟读</button>
         </div>`;
       });
       inner += `</div>`;
@@ -426,7 +426,7 @@ function startPronunciationPractice(wordsStr) {
   const words = wordsStr.split(',');
   toast('请大声朗读单词，注意发音口型 🎤', 'success');
   // Auto-speak first word to demo
-  if (words.length > 0) speak(words[0]);
+  if (words.length > 0) autoSpeak(words[0]);
 }
 
 // Task quiz
@@ -484,7 +484,7 @@ function renderTaskQuestion() {
   let html = `<div class="question-box pop-in">`;
   if (q.type === 'listen') {
     html += `<div class="question-text">🔊 听音选词</div>
-      <button class="btn btn-primary" onclick="speak('${q.target.word}')" style="margin:12px 0 20px">🔊 播放</button>`;
+      <button class="btn btn-primary" onclick="playWord('${q.target.word}',this)" style="margin:12px 0 20px">🔊 播放</button>`;
   } else if (q.extraCn) {
     html += `<div class="question-text" style="font-size:22px">${q.hint}</div>
       <div class="question-hint">选择正确的单词填入空格</div>`;
@@ -571,7 +571,7 @@ async function showErrorBook() {
     list.innerHTML = `<div class="word-list">` + errors.map(w => {
       const wd = WORD_MAP[w];
       return `<div class="word-item">
-        <button class="speaker" onclick="speak('${w}')">🔊</button>
+        <button class="speaker" onclick="playWord('${w}',this)">🔊</button>
         <div><div class="w-en">${w}</div><div class="w-cn">${wd ? wd.meaning : ''}</div></div>
       </div>`;
     }).join('') + `</div>`;

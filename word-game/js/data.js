@@ -43,23 +43,19 @@ function pickDistractors(correctWord, count) {
   return shuffle(WORDS.filter(w => w.word !== correctWord.word)).slice(0, count);
 }
 
-// Speak word using Web Speech API - 增强版
+// Speak word - Web Speech API 优先，失败时用 Audio 元素兜底
 let cachedVoices = [];
-let voicesReady = false;
 let audioUnlocked = false;
-let _chromeResumeTimer = null;
 let _speakFailCount = 0;
-const SPEAK_MAX_RETRY = 2;
+let _audioCache = {};
 
 // 标记用户已交互（解锁自动播放）
 function unlockAudio() {
   audioUnlocked = true;
-  // 移除监听，避免重复
   document.removeEventListener('click', unlockAudio);
   document.removeEventListener('touchstart', unlockAudio);
   document.removeEventListener('keydown', unlockAudio);
 }
-// 页面加载后立即监听用户交互
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('click', unlockAudio, { once: true });
@@ -72,12 +68,11 @@ if (document.readyState === 'loading') {
   document.addEventListener('keydown', unlockAudio, { once: true });
 }
 
-// 预加载语音列表（多次尝试，兼容不同浏览器）
+// 预加载语音列表
 function loadVoices() {
   if (!('speechSynthesis' in window)) return;
   try {
     cachedVoices = window.speechSynthesis.getVoices();
-    if (cachedVoices.length > 0) voicesReady = true;
   } catch(e) {}
 }
 if ('speechSynthesis' in window) {
@@ -85,7 +80,7 @@ if ('speechSynthesis' in window) {
   if (typeof window.speechSynthesis.onvoiceschanged !== 'undefined') {
     window.speechSynthesis.onvoiceschanged = loadVoices;
   }
-  // 兜底：部分浏览器 voiceschanged 不触发，定时加载几次
+  // 兜底：部分浏览器 voiceschanged 不触发，定时加载
   let tries = 0;
   const iv = setInterval(() => {
     loadVoices();
@@ -94,95 +89,52 @@ if ('speechSynthesis' in window) {
   }, 200);
 }
 
-// 选择合适的英语语音
+// 选择英语语音
 function pickEnglishVoice() {
   if (cachedVoices.length === 0) return null;
-  // 优先选择 en-US，其次 en-GB，再次任何 en 开头的
   const enUS = cachedVoices.find(v => v.lang === 'en-US' || v.lang === 'en_US');
   if (enUS) return enUS;
   const enGB = cachedVoices.find(v => v.lang === 'en-GB' || v.lang === 'en_GB');
   if (enGB) return enGB;
   const enAny = cachedVoices.find(v => v.lang.toLowerCase().startsWith('en'));
   if (enAny) return enAny;
-  // 没有英语语音，返回第一个可用语音
-  return cachedVoices[0] || null;
+  return null; // 没有英语语音时返回 null，让浏览器自行选择
 }
 
-// 核心播放函数（内部使用，用于异步重试）
-function _speakOnce(text, lang, rate) {
+// Audio 元素兜底：使用有道词典 TTS
+function _playAudioFallback(text) {
   return new Promise((resolve) => {
-    if (!('speechSynthesis' in window)) { resolve(false); return; }
-    if (cachedVoices.length === 0) loadVoices();
-
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = lang;
-    u.rate = rate;
-    u.pitch = 1;
-    u.volume = 1;
-    const voice = pickEnglishVoice();
-    if (voice) u.voice = voice;
-
-    let done = false;
-    const finish = (ok) => {
-      if (done) return;
-      done = true;
-      if (_chromeResumeTimer) { clearInterval(_chromeResumeTimer); _chromeResumeTimer = null; }
-      resolve(ok);
-    };
-    u.onstart = () => {
-      if (_chromeResumeTimer) clearInterval(_chromeResumeTimer);
-      _chromeResumeTimer = setInterval(() => {
-        try { if (window.speechSynthesis.speaking) { window.speechSynthesis.pause(); window.speechSynthesis.resume(); } } catch(e) {}
-      }, 10000);
-    };
-    u.onend = () => finish(true);
-    u.onerror = (e) => {
-      if (e && (e.error === 'interrupted' || e.error === 'canceled')) finish(true);
-      else { console.warn('_speakOnce error:', e); finish(false); }
-    };
     try {
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.resume();
-      window.speechSynthesis.speak(u);
-    } catch(e) { finish(false); }
+      const url = 'https://dict.youdao.com/dictvoice?audio=' + encodeURIComponent(text) + '&type=2';
+      let audio = _audioCache[text];
+      if (!audio) {
+        audio = new Audio(url);
+        _audioCache[text] = audio;
+      }
+      audio.currentTime = 0;
+      audio.onended = () => resolve(true);
+      audio.onerror = () => resolve(false);
+      audio.play().catch(() => resolve(false));
+      // 5 秒超时
+      setTimeout(() => resolve(false), 5000);
+    } catch(e) {
+      resolve(false);
+    }
   });
 }
 
-// 异步重试函数（在 onerror 后调用）
-function retrySpeak(text, lang, rate, attempt, resolve) {
-  if (attempt > SPEAK_MAX_RETRY) {
-    _speakFailCount++;
-    if (_speakFailCount >= 3 && typeof toast === 'function') {
-      toast('发音播放失败，请检查设备音量或刷新页面', 'error');
-    }
-    resolve(false);
-    return;
-  }
-  loadVoices();
-  setTimeout(async () => {
-    const ok = await _speakOnce(text, lang, rate);
-    if (ok) {
-      _speakFailCount = 0;
-      resolve(true);
-    } else {
-      retrySpeak(text, lang, rate, attempt + 1, resolve);
-    }
-  }, 100);
-}
-
-// 对外暴露的 speak：首次同步调用（保持用户手势上下文），失败时异步重试
-function speak(text, lang = 'en-US', rate = 0.85) {
+// 对外暴露的 speak：Web Speech API 优先，失败时 Audio 兜底
+function speak(text, lang, rate) {
+  lang = lang || 'en-US';
+  rate = rate || 0.85;
   return new Promise((resolve) => {
+    // 无 Web Speech API 支持，直接用 Audio 兜底
     if (!('speechSynthesis' in window)) {
-      if (typeof toast === 'function') toast('当前浏览器不支持语音播放', 'error');
-      resolve(false);
+      _playAudioFallback(text).then(resolve);
       return;
     }
 
-    // 确保语音列表已加载
     if (cachedVoices.length === 0) loadVoices();
-
-    // 同步取消当前播放 + 同步播放（关键：保持在用户手势调用栈中，iOS Safari 必需）
     try { window.speechSynthesis.cancel(); } catch(e) {}
 
     const u = new SpeechSynthesisUtterance(text);
@@ -191,60 +143,70 @@ function speak(text, lang = 'en-US', rate = 0.85) {
     u.pitch = 1;
     u.volume = 1;
 
+    // 仅在找到英语语音时设置
     const voice = pickEnglishVoice();
     if (voice) u.voice = voice;
 
-    let done = false;
+    let resolved = false;
+    let fallbackTimer = null;
+
     const finish = (ok) => {
-      if (done) return;
-      done = true;
-      if (_chromeResumeTimer) {
-        clearInterval(_chromeResumeTimer);
-        _chromeResumeTimer = null;
+      if (resolved) return;
+      resolved = true;
+      if (fallbackTimer) clearTimeout(fallbackTimer);
+      if (ok) {
+        _speakFailCount = 0;
+        resolve(true);
+      } else {
+        // Web Speech 失败，使用 Audio 兜底
+        _playAudioFallback(text).then(function(audioOk) {
+          if (audioOk) {
+            _speakFailCount = 0;
+            resolve(true);
+          } else {
+            _speakFailCount++;
+            if (_speakFailCount >= 3 && typeof toast === 'function') {
+              toast('发音播放失败，请检查网络和设备音量', 'error');
+            }
+            resolve(false);
+          }
+        });
       }
-      if (ok) _speakFailCount = 0;
-      resolve(ok);
     };
 
-    u.onstart = () => {
-      // Chrome 15s bug 修复：定期 resume 防止被浏览器自动终止
-      if (_chromeResumeTimer) clearInterval(_chromeResumeTimer);
-      _chromeResumeTimer = setInterval(() => {
-        try {
-          if (window.speechSynthesis.speaking) {
-            window.speechSynthesis.pause();
-            window.speechSynthesis.resume();
-          }
-        } catch(e) {}
-      }, 10000);
-    };
-    u.onend = () => finish(true);
-    u.onerror = (e) => {
-      // 'interrupted' 和 'canceled' 是主动取消，不算失败
+    // 3 秒无响应则切换到 Audio 兜底
+    fallbackTimer = setTimeout(function() { finish(false); }, 3000);
+
+    u.onend = function() { finish(true); };
+    u.onerror = function(e) {
       if (e && (e.error === 'interrupted' || e.error === 'canceled')) {
         finish(true);
       } else {
-        console.warn('Speech error, retrying:', e);
-        // 首次失败，进入异步重试
-        if (!done) retrySpeak(text, lang, rate, 1, resolve);
-        done = true; // 防止重复 resolve
+        finish(false);
       }
     };
 
     try {
-      // 同步 resume + speak，保持用户手势上下文
       window.speechSynthesis.resume();
       window.speechSynthesis.speak(u);
     } catch(e) {
-      console.warn('Speak exception, retrying:', e);
-      retrySpeak(text, lang, rate, 1, resolve);
+      finish(false);
     }
   });
 }
 
-// 自动播放（用于题目自动播放）：如果未解锁则不播放，避免被浏览器阻止
-async function autoSpeak(text) {
-  if (!audioUnlocked) return false; // 等用户点击播放按钮
+// 自动播放：仅在用户已交互时播放，避免被浏览器自动播放策略阻止
+function autoSpeak(text) {
+  if (!audioUnlocked) return Promise.resolve(false);
+  return speak(text);
+}
+
+// 带动画反馈的播放（用于按钮 onclick）
+function playWord(text, btn) {
+  if (btn) {
+    btn.classList.add('speaking');
+    setTimeout(function() { btn.classList.remove('speaking'); }, 600);
+  }
   return speak(text);
 }
 
